@@ -1,0 +1,183 @@
+<p>&nbsp;</p>
+<div style="background-color: whitesmoke; border-radius: 12px; box-shadow: rgba(0, 0, 0, 0.1) 0px 0px 10px; font-family: Arial, sans-serif; margin: auto; max-width: 700px; padding: 20px;">
+  <h2 style="color: #2c3e50; text-align: center;">Calculadora de Juros Compostos com Aportes Mensais</h2>
+
+  <label>Valor Inicial (R$):<br />
+    <input id="pv" oninput="formatarMoeda(this)" style="margin: 5px 0px; padding: 8px; width: 100%;" type="text" />
+  </label>
+
+  <label>Aporte Mensal (R$):<br />
+    <input id="aporte" oninput="formatarMoeda(this)" style="margin: 5px 0px; padding: 8px; width: 100%;" type="text" />
+  </label>
+
+  <label>Número de Períodos:<br />
+    <input id="n" style="margin: 5px 0px; padding: 8px; width: 100%;" type="text" />
+  </label>
+
+  <label>Taxa de Juros por Período (%):<br />
+    <input id="i" oninput="formatarMoeda(this, true)" style="margin: 5px 0px; padding: 8px; width: 100%;" type="text" />
+  </label>
+
+  <label>Valor Final (R$):<br />
+    <input id="fv" oninput="formatarMoeda(this)" style="margin: 5px 0px; padding: 8px; width: 100%;" type="text" />
+  </label>
+
+  <div style="margin-top: 15px; text-align: center;">
+    <button onclick="calcularCompostos()" style="background-color: #3498db; border-radius: 6px; border: none; color: white; margin-right: 10px; padding: 10px 20px;">Calcular</button>
+    <button onclick="limparCompostos()" style="background-color: #e74c3c; border-radius: 6px; border: none; color: white; margin-right: 10px; padding: 10px 20px;">Limpar</button>
+    <button onclick="baixarImagem()" style="background-color: #2ecc71; border-radius: 6px; border: none; color: white; padding: 10px 20px;">Exportar Gráfico</button>
+  </div>
+
+  <div id="resultadoCompostos" style="font-weight: bold; margin-top: 20px; text-align: center;"></div>
+  <canvas id="graficoEvolucao" style="margin-top: 30px; width: 100%; max-height: 300px;"></canvas>
+
+  <div id="tabelaResultados" style="margin-top: 20px; overflow-x: auto;"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  function formatarMoeda(campo, isPercent = false) {
+    let valor = campo.value.replace(/\D/g, '');
+    if (valor === '') {
+      campo.value = '';
+      return;
+    }
+    while (valor.length < 3) valor = '0' + valor;
+    let inteiro = valor.slice(0, -2);
+    let decimal = valor.slice(-2);
+    let formatado = parseInt(inteiro).toLocaleString('pt-BR') + ',' + decimal;
+    campo.value = formatado + (isPercent ? '%' : '');
+  }
+
+  function desformatar(valor) {
+    return parseFloat(valor.replace(/\./g, '').replace(',', '.').replace('%', ''));
+  }
+
+  function limparCompostos() {
+    ['pv', 'aporte', 'n', 'i', 'fv'].forEach(id => document.getElementById(id).value = "");
+    document.getElementById('resultadoCompostos').innerHTML = "";
+    document.getElementById('tabelaResultados').innerHTML = "";
+    if (window.grafico) window.grafico.destroy();
+  }
+
+  function baixarImagem() {
+    const link = document.createElement('a');
+    link.download = 'grafico_evolucao.png';
+    link.href = document.getElementById('graficoEvolucao').toDataURL();
+    link.click();
+  }
+
+  function calcularCompostos() {
+    let pvInput = document.getElementById('pv');
+    let aporteInput = document.getElementById('aporte');
+    let nInput = document.getElementById('n');
+    let iInput = document.getElementById('i');
+    let fvInput = document.getElementById('fv');
+
+    let pv = pvInput.value.trim() ? desformatar(pvInput.value) : NaN;
+    let aporte = aporteInput.value.trim() ? desformatar(aporteInput.value) : NaN;
+    let n = nInput.value.trim() ? parseFloat(nInput.value.replace(',', '.')) : NaN;
+    let i = iInput.value.trim() ? desformatar(iInput.value) / 100 : NaN;
+    let fv = fvInput.value.trim() ? desformatar(fvInput.value) : NaN;
+
+    let valores = [!isNaN(pv), !isNaN(aporte), !isNaN(n), !isNaN(i), !isNaN(fv)].filter(Boolean).length;
+
+    if (valores < 4) {
+      alert("Preencha pelo menos 4 dos 5 campos para calcular o que falta.");
+      return;
+    }
+
+    let resultado = "";
+
+    if (isNaN(fv)) {
+      fv = pv * Math.pow(1 + i, n) + aporte * ((Math.pow(1 + i, n) - 1) / i);
+      fvInput.value = fv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      resultado = "Valor Final calculado.";
+    } else if (isNaN(pv)) {
+      pv = (fv - aporte * ((Math.pow(1 + i, n) - 1) / i)) / Math.pow(1 + i, n);
+      pvInput.value = pv.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      resultado = "Valor Inicial calculado.";
+    } else if (isNaN(aporte)) {
+      aporte = (fv - pv * Math.pow(1 + i, n)) * i / ((Math.pow(1 + i, n) - 1));
+      aporteInput.value = aporte.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      resultado = "Aporte Mensal calculado.";
+    } else if (isNaN(n)) {
+      n = Math.log((fv * i + aporte) / (pv * i + aporte)) / Math.log(1 + i);
+      nInput.value = n.toFixed(2).replace('.', ',');
+      resultado = "Número de Períodos calculado.";
+    } else if (isNaN(i)) {
+      let guess = 0.01;
+      let maxIter = 100;
+      let tol = 1e-7;
+      for (let k = 0; k < maxIter; k++) {
+        let f = pv * Math.pow(1 + guess, n) + aporte * ((Math.pow(1 + guess, n) - 1) / guess) - fv;
+        let fPrime = pv * n * Math.pow(1 + guess, n - 1) + aporte * ((n * Math.pow(1 + guess, n - 1) * guess - (Math.pow(1 + guess, n) - 1)) / (guess * guess));
+        let newGuess = guess - f / fPrime;
+        if (Math.abs(newGuess - guess) < tol) {
+          i = newGuess;
+          break;
+        }
+        guess = newGuess;
+      }
+      iInput.value = (i * 100).toFixed(4).replace('.', ',') + '%';
+      resultado = "Taxa de Juros calculada.";
+    }
+
+    document.getElementById('resultadoCompostos').innerHTML = resultado;
+
+    if (!isNaN(pv) && !isNaN(aporte) && !isNaN(n) && !isNaN(i)) {
+      let labels = [], dados = [], tabela = '<table border="1" cellpadding="5" style="width: 100%; border-collapse: collapse;"><tr><th>Mês</th><th>Saldo</th></tr>', saldo = pv;
+      for (let j = 0; j <= Math.floor(n); j++) {
+        if (j > 0) saldo = saldo * (1 + i) + aporte;
+        labels.push('Mês ' + j);
+        dados.push(saldo);
+        tabela += `<tr><td>${j}</td><td>R$ ${saldo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td></tr>`;
+      }
+      tabela += '</table>';
+      document.getElementById('tabelaResultados').innerHTML = tabela;
+
+      if (window.grafico) window.grafico.destroy();
+      const ctx = document.getElementById('graficoEvolucao').getContext('2d');
+      window.grafico = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Evolução do Investimento',
+            data: dados,
+            borderColor: 'rgba(52, 152, 219, 1)',
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return 'R$ ' + value.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+</script>
+
+<div><br /></div>
+<div style="text-align: center;"><b><span style="font-size: medium;">Como usar a calculadora:</span></b></div>
+<div>
+  <ul style="text-align: left;">
+    <li>Preencha 4 dos 5 campos: Valor Inicial, Aporte Mensal, Número de Períodos, Taxa de Juros ou Valor Final.</li>
+    <li>Digite apenas os números. A formatação será feita automaticamente.</li>
+    <li>O campo que ficar em branco será calculado.</li>
+    <li>Clique em "Calcular" para ver o resultado, o gráfico e a tabela de evolução.</li>
+    <li>Use "Limpar" para resetar os campos e os resultados.</li>
+    <li>Use "Exportar Gráfico" para baixar a imagem do gráfico de evolução.</li>
+  </ul>
+</div>
